@@ -32,7 +32,7 @@ Backup and encrypt all of the files in the present working directory and output 
 
     $ ./backup.bash -r *.bak
 
-Decrypt and recover the contents of files ending in *\*.bak* and place them in the present working directory.
+Decrypt and recover the contents of files ending in *.bak* and place them in the present working directory.
 
     $ ./backup.bash -bo repo/mybackup foo bar baz
 
