@@ -28,6 +28,35 @@ timeit() {
 	echo $(/usr/bin/time -p $1 2>&1 | grep real | cut -d ' ' -f 2)
 }
 
+# Securely delete the target file. Use shred, otherwise fall back to dd.
+#
+# Most modern journal filesystems (ext3/4, ntfs) will only journal metadata, 
+# not actual data.
+# A quick way to check for this with ext4:
+#   $ mount | grep 'data=journal'
+#
+# Obviously the files you are encrypting are untouched, but should you choose
+# to delete them, you won't have to worry about the tar file that was created.
+# Secure deletion of files is hard, but we try here anyways. For true secure
+# deletion, you should also consider if your files previously existed elsewhere
+# on disk, or if they are cached by any other processes.
+securerm() {
+	if $(which shred >& /dev/null); then
+		shred "$1"
+		sync # Sync random bytes first.
+		shred -n 0 -u -z "$1"
+		sync
+	else
+		bytes=$(stat -c '%s' "$1")
+		dd if=/dev/urandom of="$1" bs=$bytes count=1 conv=notrunc >& /dev/null
+		sync
+		dd if=/dev/zero of="$1" bs=$bytes count=1 conv=notrunc >& /dev/null
+		sync
+		rm "$1"
+		sync
+	fi
+}
+
 #=============================================================================#
 
 OUTPUT=
@@ -106,9 +135,8 @@ if [[ $MODE == "backup" ]]; then
 
 	echo "Enter encryption key:"
 	gpg --cipher-algo AES256 --symmetric $OUTPUT
-	echo
 
-	rm $OUTPUT # Delete tar file.
+	securerm "$OUTPUT" # Delete intermediate tar file.
 else
 	# Set output directory.
 	if [[ -z $OUTPUT ]]; then
@@ -142,6 +170,8 @@ else
 			exit 1
 		fi
 
-		echo -e "De-archiving finished in $exectime seconds.\n"
+		echo -e "De-archiving finished in $exectime seconds."
 		done
+
+		securerm "$out"
 fi
