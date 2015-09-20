@@ -34,8 +34,6 @@ OUTPUT=
 MODE=
 FILES=
 
-#=============================================================================#
-
 if [[ $# -lt 1 ]]; then
 	echo "$0: You must choose either backup mode or recovery mode."
 	usage
@@ -68,28 +66,28 @@ while getopts "ho:br" OPT; do
 			exit 1 ;;
 	esac
 done
-shift $((OPTIND - 1)) # Shift past arguments to any input FILES.
+shift $((OPTIND - 1)) # Shift over to parse any input files arguments.
 
 # Use files in pwd if no input files are given.
 # This will backup all the files from where the script is run.
-if [[ -z $@ ]]; then
+if [[ -z "$@" ]]; then
 	FILES="*"
 else
 	FILES="$@"
 
 	# Check if these files exist.
 	for file in $FILES; do
-		if [[ -e $file ]]; then
+		if [[ -e "$file" ]]; then
 			continue
 		else
-			echo "$0: $file does not exist!"
+			echo "$0: "$file" does not exist!"
 			exit 1
 		fi
 	done
 fi
 
 if [[ $MODE == "backup" ]]; then
-	# Was an output file given?
+	# Set output file name.
 	if [[ -z $OUTPUT ]]; then
 		OUTPUT="data_backup.tar"
 	else
@@ -97,7 +95,6 @@ if [[ $MODE == "backup" ]]; then
 	fi
 
 	echo "Beginning archival process ..."
-
 	exectime=$(timeit "tar -cf "$OUTPUT" $FILES --exclude="$OUTPUT.gpg"")
 
 	if [[ $? -ne 0 ]]; then
@@ -105,7 +102,7 @@ if [[ $MODE == "backup" ]]; then
 		exit 1
 	fi
 
-	echo -e "Archival finished in $exectime seconds.\n"
+	echo -e "Archiving finished in $exectime seconds.\n"
 
 	echo "Enter encryption key:"
 	gpg --cipher-algo AES256 --symmetric $OUTPUT
@@ -113,12 +110,13 @@ if [[ $MODE == "backup" ]]; then
 
 	rm $OUTPUT # Delete tar file.
 else
-	# Was an output dir given?
+	# Set output directory.
 	if [[ -z $OUTPUT ]]; then
 		OUTPUT="."
 	fi
 
 	for file in $FILES; do
+		# Skip non-GPG encrypted files.
 		file "$file" | cut -d ' ' -f 2- | grep -i 'gpg' > /dev/null
 		if [[ $? -ne 0 ]]; then
 			continue
@@ -130,6 +128,7 @@ else
 		gpg --output $out --decrypt $file
 		echo
 
+		# Skip non-tar archived files.
 		file "$out" | cut -d ' ' -f 2- | grep -i 'tar' > /dev/null
 		if [[ $? -ne 0 ]]; then
 			continue
@@ -143,8 +142,6 @@ else
 			exit 1
 		fi
 
-		rm $out
-
-		echo -e "De-archival finished in $exectime seconds.\n"
+		echo -e "De-archiving finished in $exectime seconds.\n"
 		done
 fi
